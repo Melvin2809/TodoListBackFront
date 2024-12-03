@@ -1,28 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Clock, Tag, User, Users } from 'lucide-react';
+import { getCookie } from 'cookies-next';
 
 export default function Task({ task, setOpen, setIsUpdate, setCurrentTask }) {
     const router = useRouter();
+    const [isDeleting, setIsDeleting] = useState(false);
     const isLate = new Date(task.deadline) < new Date() && task.status !== "complétée";
 
-    const deleteTask = async (taskId) => {
+    const updateTaskStatus = async (taskId, newStatus) => {
         try {
+            const token = getCookie('authToken');
             const response = await fetch(`http://localhost:3001/tasks/${taskId}`, {
-                method: 'DELETE',
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ status: newStatus })
             });
 
             if (response.ok) {
-                alert("Tâche supprimée !");
-                router.refresh();
+                alert(`Tâche marquée comme "${newStatus}" !`);
+                router.refresh(); // Recharge la liste des tâches
             } else {
                 throw new Error('Erreur serveur');
             }
         } catch (error) {
-            alert("Erreur lors de la suppression.");
+            alert("Erreur lors de la mise à jour du statut.");
         }
     };
 
@@ -38,6 +43,32 @@ export default function Task({ task, setOpen, setIsUpdate, setCurrentTask }) {
             assignedUser: task.assignedUser,
             groupId: task.groupId,
         });
+    };
+
+    const deleteTask = async (taskId) => {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer cette tâche ?')) {
+            return;
+        }
+
+        try {
+            const token = getCookie('authToken');
+            const response = await fetch(`http://localhost:3001/tasks/${taskId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                alert('Tâche supprimée avec succès !');
+                router.refresh(); // Recharge la liste des tâches
+            } else {
+                throw new Error('Erreur lors de la suppression');
+            }
+        } catch (error) {
+            console.error('Erreur lors de la suppression:', error);
+            alert("Erreur lors de la suppression de la tâche.");
+        }
     };
 
     return (
@@ -95,18 +126,31 @@ export default function Task({ task, setOpen, setIsUpdate, setCurrentTask }) {
 
             <div className="mt-4 flex justify-end space-x-3">
                 <button
+                    onClick={() => updateTaskStatus(task.id, 'complétée')}
+                    className="flex items-center px-3 py-1.5 text-sm text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                >
+                    Marquer comme fait
+                </button>
+                <button
+                    onClick={() => updateTaskStatus(task.id, 'abandonnée')}
+                    className="flex items-center px-3 py-1.5 text-sm text-yellow-600 hover:bg-yellow-50 rounded-md transition-colors"
+                >
+                    Abandonner
+                </button>
+                <button
                     onClick={handleUpdate}
                     className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                 >
-                    <Pencil size={16} className="mr-1" />
+                    <Pencil size={16} className="mr-2" />
                     Modifier
                 </button>
                 <button
                     onClick={() => deleteTask(task.id)}
+                    disabled={isDeleting}
                     className="flex items-center px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
                 >
-                    <Trash2 size={16} className="mr-1" />
-                    Supprimer
+                    <Trash2 size={16} className="mr-2" />
+                    {isDeleting ? 'Suppression...' : 'Supprimer'}
                 </button>
             </div>
         </div>

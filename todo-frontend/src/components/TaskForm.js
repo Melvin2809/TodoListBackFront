@@ -1,21 +1,71 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from "next/navigation";
+import { getCookie } from 'cookies-next';
 
 export default function TaskForm({ currentTask, setCurrentTask, isUpdate }) {
     const router = useRouter();
-    const [errors, setErrors] = useState({ title: "", category: "", deadline: "" }); // Gestion des erreurs
+
+    // État local pour les champs du formulaire
+    const [formValues, setFormValues] = useState({
+        title: "",
+        category: "",
+        deadline: "",
+        status: "à faire",
+        assignedUser: "",
+        groupId: "",
+    });
+
+    const [errors, setErrors] = useState({
+        title: "",
+        category: "",
+        deadline: "",
+        assignedUser: "",
+        groupId: "",
+    });
+
+    const [groups, setGroups] = useState([]); // Liste des groupes
+
+    // Synchronisation avec `currentTask` lorsque le composant est monté ou mis à jour
+    useEffect(() => {
+        if (currentTask) {
+            setFormValues({ ...currentTask });
+        }
+    }, [currentTask]);
+
+    // Charger les groupes disponibles
+    useEffect(() => {
+        const token = getCookie("authToken");
+        fetch("http://localhost:3001/groups", {
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Erreur lors de la récupération des groupes.");
+                }
+                return response.json();
+            })
+            .then((data) => setGroups(data))
+            .catch((error) => console.error("Erreur :", error));
+    }, []);
 
     const validateForm = () => {
         const newErrors = {};
-        if (!currentTask.title || currentTask.title.trim() === "") {
+        if (!formValues.title || formValues.title.trim() === "") {
             newErrors.title = "Le champ titre est requis.";
         }
-        if (!currentTask.category || currentTask.category.trim() === "") {
+        if (!formValues.category || formValues.category.trim() === "") {
             newErrors.category = "Le champ catégorie est requis.";
         }
-        if (!currentTask.deadline || currentTask.deadline.trim() === "") {
-            newErrors.deadline = "Le champ deadline est requis.";
+        if (!formValues.deadline || isNaN(new Date(formValues.deadline))) {
+            newErrors.deadline = "La deadline doit être une date valide.";
         }
+        if (!formValues.assignedUser || isNaN(formValues.assignedUser)) {
+            newErrors.assignedUser = "Un ID utilisateur valide est requis.";
+        }
+        
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0; // Retourne true si aucune erreur
     };
@@ -23,62 +73,40 @@ export default function TaskForm({ currentTask, setCurrentTask, isUpdate }) {
     const submitForm = async (e) => {
         e.preventDefault();
         if (!validateForm()) {
-            return; // Bloque la soumission si le formulaire est invalide
+            return;
         }
-        
-        
 
-        let fetchMethod = 'POST';
-        let url = 'http://localhost:3001/tasks';
-
-        if (isUpdate) {
-            fetchMethod = 'PUT';
-            url = `http://localhost:3001/tasks/${currentTask.id}`;
-        }
+        const fetchMethod = isUpdate ? "PUT" : "POST";
+        const url = isUpdate
+            ? `http://localhost:3001/tasks/${currentTask.id}`
+            : "http://localhost:3001/tasks";
 
         await fetch(url, {
             method: fetchMethod,
-            body: JSON.stringify({
-                title: currentTask.title,
-                category: currentTask.category,
-                deadline: currentTask.deadline,
-                status: currentTask.status,
-                assignedUser: currentTask.assignedUser,
-                groupId: currentTask.groupId
-            }),
+            body: JSON.stringify(formValues),
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getCookie('authToken')}`,
             },
         })
             .then((response) => {
                 if (response.ok) {
                     alert(isUpdate ? "Tâche modifiée !" : "Tâche ajoutée !");
-                    router.refresh(); // Recharge la liste des tâches
+                    setCurrentTask(formValues); // Met à jour `currentTask` après succès
+                    router.refresh();
                 } else {
                     throw new Error("Erreur lors de l'ajout/modification.");
                 }
             })
             .catch(() => alert("Erreur lors de l'ajout/modification. Réessayez."));
     };
-    const InputField = ({ id, type = "text", value, onChange, error }) => (
-        <div className="col-span-full space-y-2">
-            
-            <input
-                type={type}
-                id={id}
-                name={id}
-                value={value || ''}
-                onChange={onChange}
-                className={`w-full px-4 py-2 rounded-lg border transition duration-150 ease-in-out
-                    ${error ? 'border-red-500 ring-red-500' : 'border-gray-300 hover:border-gray-400'}
-                    focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
-                    bg-white shadow-sm`}
-            />
-            {error && (
-                <p className="text-sm text-red-600 mt-1">{error}</p>
-            )}
-        </div>
-    );
+
+    const handleInputChange = (e) => {
+        const { id, value } = e.target;
+        setFormValues((prev) => ({ ...prev, [id]: value }));
+        setErrors((prev) => ({ ...prev, [id]: "" })); // Réinitialise les erreurs pour ce champ
+    };
+
     return (
         <form onSubmit={submitForm}>
             <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
@@ -87,18 +115,16 @@ export default function TaskForm({ currentTask, setCurrentTask, isUpdate }) {
                     <label htmlFor="title" className="block text-sm font-medium leading-6 text-gray-900">
                         Titre
                     </label>
-                    <div className="mt-2">
-                    <InputField
-                    id="title"
-                    value={currentTask.title}
-                    onChange={(e) => {
-                        setCurrentTask({ ...currentTask, title: e.target.value });
-                        setErrors({ ...errors, title: "" });
-                    }}
-                    error={errors.title}
-                />
-                    </div>
-                    
+                    <input
+                        type="text"
+                        id="title"
+                        value={formValues.title}
+                        onChange={handleInputChange}
+                        className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ${
+                            errors.title ? "ring-red-500" : "ring-gray-300"
+                        }`}
+                    />
+                    {errors.title && <p className="text-sm text-red-600">{errors.title}</p>}
                 </div>
 
                 {/* Catégorie */}
@@ -106,18 +132,16 @@ export default function TaskForm({ currentTask, setCurrentTask, isUpdate }) {
                     <label htmlFor="category" className="block text-sm font-medium leading-6 text-gray-900">
                         Catégorie
                     </label>
-                    <div className="mt-2">
-                    <InputField
-                        label="Catégorie"
+                    <input
+                        type="text"
                         id="category"
-                        value={currentTask.category}
-                        onChange={(e) => {
-                            setCurrentTask({ ...currentTask, category: e.target.value });
-                            setErrors({ ...errors, category: "" });
-                        }}
-                        error={errors.category}
+                        value={formValues.category}
+                        onChange={handleInputChange}
+                        className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ${
+                            errors.category ? "ring-red-500" : "ring-gray-300"
+                        }`}
                     />
-                    </div>
+                    {errors.category && <p className="text-sm text-red-600">{errors.category}</p>}
                 </div>
 
                 {/* Deadline */}
@@ -125,20 +149,16 @@ export default function TaskForm({ currentTask, setCurrentTask, isUpdate }) {
                     <label htmlFor="deadline" className="block text-sm font-medium leading-6 text-gray-900">
                         Deadline
                     </label>
-                    <div className="mt-2">
-                    <InputField
-                    label="Deadline"
-                    id="deadline"
-                    type="date"
-                    value={currentTask.deadline}
-                    onChange={(e) => {
-                        setCurrentTask({ ...currentTask, deadline: e.target.value });
-                        setErrors({ ...errors, deadline: "" });
-                    }}
-                    error={errors.deadline}
+                    <input
+                        type="date"
+                        id="deadline"
+                        value={formValues.deadline}
+                        onChange={handleInputChange}
+                        className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ${
+                            errors.deadline ? "ring-red-500" : "ring-gray-300"
+                        }`}
                     />
-                    </div>
-                    
+                    {errors.deadline && <p className="text-sm text-red-600">{errors.deadline}</p>}
                 </div>
 
                 {/* Statut */}
@@ -146,25 +166,17 @@ export default function TaskForm({ currentTask, setCurrentTask, isUpdate }) {
                     <label htmlFor="status" className="block text-sm font-medium leading-6 text-gray-900">
                         Statut
                     </label>
-                    <div className="mt-2">
-                        <select
-                            name="status"
-                            id="status"
-                            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-green-600 sm:text-sm sm:leading-6"
-                            onChange={(e) => {
-                                setCurrentTask({
-                                    ...currentTask,
-                                    status: e.target.value,
-                                });
-                            }}
-                            value={currentTask.status}
-                        >
-                            <option value="à faire">À faire</option>
-                            <option value="en cours">En cours</option>
-                            <option value="complétée">Complétée</option>
-                            <option value="abandonnée">Abandonnée</option>
-                        </select>
-                    </div>
+                    <select
+                        id="status"
+                        value={formValues.status}
+                        onChange={handleInputChange}
+                        className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset focus:ring-green-500"
+                    >
+                        <option value="à faire">À faire</option>
+                        <option value="en cours">En cours</option>
+                        <option value="complétée">Complétée</option>
+                        <option value="abandonnée">Abandonnée</option>
+                    </select>
                 </div>
 
                 {/* Utilisateur assigné */}
@@ -172,42 +184,41 @@ export default function TaskForm({ currentTask, setCurrentTask, isUpdate }) {
                     <label htmlFor="assignedUser" className="block text-sm font-medium leading-6 text-gray-900">
                         Assigné à (ID utilisateur)
                     </label>
-                    <div className="mt-2">
-                        <input
-                            type="number"
-                            name="assignedUser"
-                            id="assignedUser"
-                            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-green-600 sm:text-sm sm:leading-6"
-                            onChange={(e) => {
-                                setCurrentTask({
-                                    ...currentTask,
-                                    assignedUser: e.target.value,
-                                });
-                            }}
-                            value={currentTask.assignedUser || ''}
-                        />
-                    </div>
+                    <input
+                        type="number"
+                        id="assignedUser"
+                        value={formValues.assignedUser}
+                        onChange={handleInputChange}
+                        className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ${
+                            errors.assignedUser ? "ring-red-500" : "ring-gray-300"
+                        }`}
+                    />
+                    {errors.assignedUser && (
+                        <p className="text-sm text-red-600">{errors.assignedUser}</p>
+                    )}
                 </div>
+
                 {/* Groupe */}
                 <div className="col-span-full">
                     <label htmlFor="groupId" className="block text-sm font-medium leading-6 text-gray-900">
-                        Groupe (ID)
+                        Groupe
                     </label>
-                    <div className="mt-2">
-                        <input
-                            type="number"
-                            name="groupId"
-                            id="groupId"
-                            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-green-600 sm:text-sm sm:leading-6"
-                            onChange={(e) => {
-                                setCurrentTask({
-                                    ...currentTask,
-                                    groupId: e.target.value,
-                                });
-                            }}
-                            value={currentTask.groupId || ''}
-                        />
-                    </div>
+                    <select
+                        id="groupId"
+                        value={formValues.groupId}
+                        onChange={handleInputChange}
+                        className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ${
+                            errors.groupId ? "ring-red-500" : "ring-gray-300"
+                        }`}
+                    >
+                        <option value="">Choisir un groupe</option>
+                        {groups.map((group) => (
+                            <option key={group.id} value={group.id}>
+                                {group.name}
+                            </option>
+                        ))}
+                    </select>
+                    {errors.groupId && <p className="text-sm text-red-600">{errors.groupId}</p>}
                 </div>
             </div>
 

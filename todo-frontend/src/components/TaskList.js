@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import Task from "./Task";
+import { getCookie } from 'cookies-next';
+
 
 export default function TaskList({ setOpen, setIsUpdate, setCurrentTask }) {
     const [tasks, setTasks] = useState([]);
@@ -14,10 +16,12 @@ export default function TaskList({ setOpen, setIsUpdate, setCurrentTask }) {
         setError(null);
 
         try {
+            const token = getCookie('authToken');
             const response = await fetch('http://localhost:3001/tasks', {
                 method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
                 }
             });
 
