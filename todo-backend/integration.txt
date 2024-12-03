@@ -1,0 +1,86 @@
+# Modifications Effectuées
+
+## 1. Routes Implémentées
+
+### group.route.js
+- ✅ POST `/create` : Création d'un groupe
+- ✅ POST `/:groupId/invite` : Invitation de membres
+- ✅ GET `/user/:userId` : Consultation des groupes d'un utilisateur
+- ✅ GET `/:groupId/members` : Liste des membres d'un groupe
+- ✅ DELETE `/:groupId/members/:userId` : Suppression de membres
+- ✅ POST `/:groupId/transfer-admin` : Transfert du rôle d'admin
+- ✅ DELETE `/:groupId/leave` : Quitter un groupe
+
+### task.route.js
+- ✅ Routes existantes améliorées :
+  - GET `/` : Liste des tâches avec étiquettes et assignations
+  - POST `/` : Création avec support des groupes
+  - GET `/:id` : Détails avec relations
+  - PUT `/:id` : Mise à jour avec vérifications
+  - DELETE `/:id` : Suppression avec permissions
+
+- ✅ Nouvelles routes ajoutées :
+  - GET `/group/:groupId` : Tâches d'un groupe
+  - POST `/:taskId/labels` : Ajout d'étiquettes
+
+## 2. Modèles Créés/Modifiés
+
+### group.model.js (✅ Nouveau)
+- Champs : id, name, description, createdBy
+- Relations avec User (creator et members)
+- Timestamps activés
+
+### groupMember.model.js (✅ Nouveau)
+- Champs : id, userId, groupId, role
+- Gestion des rôles (admin/member)
+- Relations avec User et Group
+
+### task.model.js (✅ Modifié)
+- Nouveaux champs : isPrivate, createdBy, assignedUser, groupId
+- Relations ajoutées avec User, Group et Label
+- Getter pour vérifier les dea
+
+## 3. Fonctionnalités Ajoutées
+
+### Gestion des Groupes
+- ✅ Système de rôles (admin/member)
+- ✅ Vérifications des permissions
+- ✅ Gestion des membres
+
+### Gestion des Tâches
+- ✅ Support des tâches privées et de groupe
+- ✅ Système d'étiquettes
+- ✅ Assignation aux membres
+- ✅ Vérification des deadlines
+- ✅ Statuts personnalisés
+
+## 4. Modifications Techniques
+
+### Structure
+- ✅ Conservation du style de code existant
+- ✅ Utilisation des promesses
+- ✅ Messages d'erreur en français
+
+### Sécurité
+- ✅ Vérification des appartenances aux groupes
+- ✅ Contrôle des permissions sur les tâches privées
+- ✅ Validation des rôles pour les actions administratives
+
+### Relations
+- ✅ User <-> Task (creator/assignee)
+- ✅ User <-> Group (via GroupMember)
+- ✅ Task <-> Label
+- ✅ Task <-> Group
+
+## 5. À Faire (Suggestions)
+- [ ] Ajouter des tests unitaires
+- [ ] Implémenter un système de notifications
+- [ ] Ajouter des filtres de recherche avancés
+- [ ] Mettre en place un système de tri des tâches
+- [ ] Ajouter des statistiques de groupe
+
+## 6. Notes Importantes
+- Les messages d'erreur sont standardisés et en français
+- La structure de réponse API est cohérente
+- Les vérifications de sécurité sont systématiques
+- Le code suit les bonnes pratiques ES6
